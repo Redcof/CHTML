@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <title>iSsample</title>
+    <style type='text/css'>
+        *{font-family: sans-serif; font-size: 14px}
+    </style>
+</head>
+<body>
+<div id="output">
+    <?chtml
+    	StructContext *POST = (StructContext *)IP_WEBS_RetrieveUserContext(pOutput);
+        if(POST != NULL)
+        {
+        	IP_WEBS_SendString(pOutput,"Name: ");
+        	IP_WEBS_SendString(pOutput,POST->Name);
+
+        	IP_WEBS_SendString(pOutput,"Password: ");
+        	IP_WEBS_SendString(pOutput,POST->Pass);
+
+        	IP_WEBS_SendString(pOutput,"File: ");
+        	IP_WEBS_SendString(pOutput,POST->File);
+        }
+    ?>
+</div>
+<form action='iSSampleSubmit.cgi' method='POST' enctype='multipart/form-data'>
+    <label for="inp1">Name: </label>
+    <input id="inp1" type='text' name="name" placeholder="Name"><br/>
+
+    <label for="inp2">Password: </label>
+    <input id="inp2" type='Password' name="pass" placeholder="Passwors"><br/>
+
+    <label for="inp3">Name: </label>
+    <input id="inp3" type='file' name="file" value="Choose"><br/>
+
+    <input type="submit" value="Submit">
+</form>
+</body>
+</html>

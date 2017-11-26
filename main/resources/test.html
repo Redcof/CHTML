@@ -1,0 +1,542 @@
+/**
+ * Created by int_soumen on 05-05-2017.
+ */
+/** This variable stores the CSS selector of
+     * monitoring container of currently selected tab */
+var LogContainerParentSelectorPrefix = '';
+var LogContainer, __MBCS_GLOBAL_LOG_INTERVAL_HANDELLER;
+var LogFileMemoryUsagesBox = null;
+/** Decides whether monitoring should be running or not */
+var MonitoringAbility = !1;
+var MemoryUsages = 0;
+var PlayPauseBtn;
+var SavedFileCounter = 0;
+const __MBCS_LOG_CLEAR_CONFORMATION_MESSAGE = "It will remove all the communication messages logged.If you want" +
+    " to save the logged messages, click on 'Cancel' and save the logged messages in 'file' Else continue by clicking on 'OK'.";
+const __MBCS_MAX_MEMORY_ALLOWED = <?chtml IP_WEBS_SendUnsigned(pOutput,LogFileSizeInByte,10,0);?>;/* (in byte)*/
+const __MAX_FILE_SIZE_LIMIT_IN_HUMAN_READABLE = bytesToSize(__MBCS_MAX_MEMORY_ALLOWED);
+var __MBCS_LOG_FETCH_URL = '<?chtml IP_WEBS_SendString(pOutput,pAJAXMonitoringLogCGI); ?>';
+var __MBCS_LOG_FETCH_INTERVAL = <?chtml IP_WEBS_SendUnsigned(pOutput,LogFetchInterval_Sec,10,0);?>;
+    /* in mill Second */
+var MonitoringRefreshRequestParams;
+var __MBCS_MASTER_MONITORING_CONFIG = <?chtml IP_WEBS_SendString(pOutput,pMonitoringLogConfigurationJSON);?>;
+var __MBCS_MASTER_MONITORING_TAB_CONF = null;
+
+function setMasterMonitoring(Object, key, value) {
+    Object[key] = value;
+}
+
+function getMasterMonitoring(Object, key) {
+    return Object[key];
+}
+
+/** */
+function changeLogContainerParentSelector(tabIndex) {
+    LogContainerParentSelectorPrefix = ' div#tabpage_' + tabIndex + '.tabpage > div.comm-log ';
+    __MBCS_MASTER_MONITORING_TAB_CONF = __MBCS_MASTER_MONITORING_CONFIG['tabpage_' + tabIndex];
+    __MBCS_LOG_FETCH_URL = getMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'cgi');
+    __MBCS_LOG_FETCH_INTERVAL = getMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'refresh_mSec');
+}
+
+function reloadMonitoringLogFromCache() {
+    SSThread(function () {
+        /** Appending Log lo local storage*/
+        var arrayPastMonData = JSON.parse(localStorage.getItem(getLocalStorageKeyForMonitoringLog(__MBCS_SELECTED_TAB_INDEX)));
+        arrayPastMonData = arrayPastMonData || [];
+        localStorage.removeItem(getLocalStorageKeyForMonitoringLog(__MBCS_SELECTED_TAB_INDEX));
+        clearLog();
+        /** Appending log to container*/
+        appendMonitoringLog(__MBCS_SELECTED_TAB_INDEX, arrayPastMonData);
+    }, 5);
+
+}
+
+function getLocalStorageKeyForMonitoringLog(tabID) {
+    return 'mon_dat_for_K' + __MBCS_PAGE_ID + '_T' + tabID;
+}
+
+function appendMonitoringLog(tabID, data, CSSClass) {
+    SSThread(function () {
+        CSSClass = CSSClass || 'some-class';
+
+        /** Preparing log container*/
+        var LogContainerParentSelectorPrefixL = ' div#tabpage_' + tabID + '.tabpage > div.comm-log ';
+        var LogContainerL = $(LogContainerParentSelectorPrefixL + ' div.comm-log-container > ol')[0];
+        var LogFileMemoryUsagesBox = $(LogContainerParentSelectorPrefixL + ' .MemoryUsages')[0];
+
+        /** Scroll the container to bottom*/
+        var scrollDiv = $(LogContainerParentSelectorPrefixL + ' div.comm-log-container')[0];
+
+        var ArrayType = Array.isArray(data);
+
+        /** Appending Log lo local storage*/
+        var arrayPastMonData = JSON.parse(localStorage.getItem(getLocalStorageKeyForMonitoringLog(tabID)));
+        arrayPastMonData = arrayPastMonData || [];
+
+        if (ArrayType === false) {
+            data = [data];
+        }
+
+        var Length = data.length;
+
+        for (var Ctr = 0; Ctr < Length; ++Ctr) {
+            var Content = data[Ctr];
+            var li = document.createElement('li');
+
+            li.innerHTML = decodeURI(Content);
+
+            li.className = CSSClass;
+
+            /** Appending log to container*/
+            LogContainerL.appendChild(li);
+
+            /** Appending Log lo local storage*/
+            arrayPastMonData.push(Content);
+        }
+
+
+        /** Scroll the container to bottom*/
+        scrollDiv.scrollTop = scrollDiv.scrollHeight;
+
+
+        /** Appending Log lo local storage*/
+        localStorage.setItem(getLocalStorageKeyForMonitoringLog(tabID), JSON.stringify(arrayPastMonData));
+    }, 10);
+
+}
+
+function fetchMonitoringLog() {
+    if (!0 === MonitoringAbility) {
+        ajax({
+            url: __MBCS_LOG_FETCH_URL,
+            params: MonitoringRefreshRequestParams,
+            success: function (response) {
+                if (checkMemoryUsages()) {
+                    try {
+                        var JSONObj = JSON.parse(response);
+                        /* This will make sure two things
+                        * 1.Valid data is available, other wise will create exception
+                        * 2.At least 1 well formatted data is available, otherwise will go to else
+                        * */
+                        if (JSONObj.data.length > 0) {
+                            /** Appending log*/
+                            appendMonitoringLog(JSONObj.T, JSONObj.data);
+                            /** Update memory usages*/
+                            MemoryUsages = LogContainer.innerHTML.length;
+                            fetchMonitoringLog();
+                        } else {
+                            setTimeout(fetchMonitoringLog, __MBCS_LOG_FETCH_INTERVAL);
+                        }
+                    }
+                    catch (e) {
+                        setTimeout(fetchMonitoringLog, __MBCS_LOG_FETCH_INTERVAL);
+                    }
+                }
+            },
+            error: function (error) {
+                setTimeout(fetchMonitoringLog, __MBCS_LOG_FETCH_INTERVAL);
+            }
+        });
+    }
+}
+
+/** @author int_soumen
+ * Initialize Monitoring Operation Before Starting
+ * @param void
+ * @return boolean
+ * */
+const LinearGradientRegex = /(rgba\(([0-9]{1,3},\s){3}[0-9]{1,3}\))\s((linear-gradient)\(([a-z\s]+),\s(((rgb\(([0-9]{1,3},\s){2}[0-9]{1,3}\))\s[0-9]{1,3}%,\s){1,3}(rgb\(([0-9]{1,3},\s){2}[0-9]{1,3}\))\s[0-9]{1,3}%)\))/;
+const RGBRegex = /(rgb\([0-9]{1,3},\s[0-9]{1,3},\s[0-9]{1,3}\))\s[0-9]{1,3}%,\s/;
+var MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE1 = '';
+var MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE2 = '';
+
+function initLogMonitoring() {
+    try {
+        if (0 < __MBCS_MASTER_MONITORING_CONFIG.monitoringTabId.length) {
+            if (-1 < __MBCS_MASTER_MONITORING_CONFIG.monitoringTabId.indexOf(Number(__MBCS_SELECTED_TAB_INDEX))) {
+                changeLogContainerParentSelector(__MBCS_SELECTED_TAB_INDEX);
+                LogContainer = $(LogContainerParentSelectorPrefix + ' div.comm-log-container > ol')[0];
+                LogFileMemoryUsagesBox = $(LogContainerParentSelectorPrefix + ' .MemoryUsages')[0];
+                var MemoryStatusGradientStyle = window.getComputedStyle(LogFileMemoryUsagesBox);
+                var GradientValue = MemoryStatusGradientStyle.getPropertyValue('background');
+
+                var Match = LinearGradientRegex.exec(GradientValue);
+                var MatchedRegex = Match[6].split(RGBRegex);
+
+                MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE1 = MatchedRegex[1];
+                MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE2 = MatchedRegex[5];
+
+                PlayPauseBtn = $(LogContainerParentSelectorPrefix + ' .PlayPauseBtn')[0];
+                MonitoringRefreshRequestParams = urlEncode({
+                    V: __MBCS_V,
+                    K: __MBCS_PAGE_ID,
+                    T: __MBCS_SELECTED_TAB_INDEX
+                });
+                return true;
+            }
+            return false;
+
+        }
+        return false;
+    }
+    catch (e) {
+        return false;
+    }
+
+}
+
+/** @author int_soumen
+ * Start Monitoring Operation
+ * @param void
+ * @return void
+ * */
+function startLogMonitoring() {
+
+    if (initLogMonitoring()) {
+        __mbcs_bindMonitoringWindowActions();
+        startLogging();
+    }
+}
+
+function checkMemoryUsages() {
+    try {
+        LogFileMemoryUsagesBox.innerHTML = 'File Size: ' + bytesToSize(MemoryUsages, 2) + ' of ' + __MAX_FILE_SIZE_LIMIT_IN_HUMAN_READABLE;
+        var Re = (MemoryUsages / __MBCS_MAX_MEMORY_ALLOWED) * 100;
+        /*Update progress in log bar*/
+        LogFileMemoryUsagesBox.style.background = 'linear-gradient(to right, ' +
+            MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE1 +
+            ' 0%, ' +
+            MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE1 +
+            ' ' +
+            Re +
+            '%, ' +
+            MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE2 +
+            ' ' +
+            Re +
+            '%, ' +
+            MBCS_MEMORY_STATUS_GRADIENT_COLOR_VALUE2 +
+            ' 100%)';
+        /*Update progress in log title*/
+        LogFileMemoryUsagesBox.title = (100 - Re).toFixed(2) + '% free';
+
+        if (MemoryUsages >= __MBCS_MAX_MEMORY_ALLOWED) {
+            /** If maximum memory limit reached
+             * stop logging; save log file; clear log; restart logging*/
+            stopLogging();
+            /** Stop Logging*/
+            SavedFileCounter += 1;
+            var FileName = getMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'logFileName') + dateFormatAs('MM-DD-YYYY_HH:mm:ss') + '_' + SavedFileCounter;
+            saveFile(FileName);
+            SSThread(clearLog, 10);
+            /** Save Log*/
+            __mbcs_showNotification('Log memory size limit is reached.<br/>Log is save as <u>' + FileName + '.htm</u> at your browser\'s default download location.', __MBCS_NOTI_TYPE_MESSAGE);
+
+            return false;
+        }
+        return true;
+    }
+    catch (e) {
+    }
+
+}
+
+function startLogging() {
+    setMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'currentMonitoringStatus', true);
+    PlayPauseBtn.innerHTML = '<i class="flaticon-pause-button" ></i>Pause';
+    addClass(PlayPauseBtn, 'status-playing');
+    MonitoringAbility = !0;
+    fetchMonitoringLog();
+}
+
+function stopLogging() {
+    try {
+        setMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'currentMonitoringStatus', false);
+        removeClass(PlayPauseBtn, 'status-playing');
+        PlayPauseBtn.innerHTML = '<i class="flaticon-play-button"></i>Continue';
+        MonitoringAbility = !1;
+    }
+    catch (e) {
+    }
+
+}
+
+function toggleLogging() {
+    if (true === !!getMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'currentMonitoringStatus')) {
+        stopLogging();
+    }
+    else if (MemoryUsages <= __MBCS_MAX_MEMORY_ALLOWED) {
+        startLogging();
+    }
+    else {
+        __mbcs_showNotification('Log memory size limit is reached.<br/>Please export log, clear log and continue logging.', __MBCS_NOTI_TYPE_ERROR);
+    }
+}
+
+function clearLogPrompt() {
+    var clearLogWindowJSON = {
+        heading: '',
+        body: __MBCS_LOG_CLEAR_CONFORMATION_MESSAGE,
+        height: '',
+        width: '',
+        buttons: [
+            {
+                title: '<i class="flaticon-delete" style="color: #ff0000;"></i> OK',
+                hvtxt: 'Click OK to clear logs',
+                url: 'action://onclick/clearLog'
+            },
+            {
+                title: 'Cancel',
+                hvtxt: 'Click to close window',
+                url: 'action://onclick/__mbcs_hidePopup'
+            }
+        ]
+    };
+
+    __mbcs_showPopup(JSON.stringify(clearLogWindowJSON));
+}
+
+function clearLog() {
+    LogContainer.innerHTML = '';
+    LogFileMemoryUsagesBox.innerHTML = 'File Size: 0 B of ' + __MAX_FILE_SIZE_LIMIT_IN_HUMAN_READABLE;
+    MemoryUsages = 0;
+    __mbcs_hidePopup();
+    localStorage.removeItem(getLocalStorageKeyForMonitoringLog(__MBCS_SELECTED_TAB_INDEX));
+}
+
+function fileSavePrompt() {
+    SavedFileCounter += 1;
+    var FileName = getMasterMonitoring(__MBCS_MASTER_MONITORING_TAB_CONF, 'logFileName') + dateFormatAs('MM-DD-YYYY_HH:mm:ss') + '_' + SavedFileCounter;
+    FileName = prompt('Please enter file name ', FileName);
+    saveFile(FileName);
+}
+
+function saveFile(FileName) {
+    if (!!FileName) {
+        var comm_log = $(LogContainerParentSelectorPrefix)[0];
+        var actions = $E(comm_log, '.action-buttons')[0];
+
+        stopLogging();
+        actions.style.visibility = 'hidden';
+
+        var CSS = '@media all { ' +
+            '*{font-family:Consolas,Monaco,monospaced;font-size:14px} ' +
+            'li{font-size:12px} ' +
+            'li:nth-child(odd){background:#e9e9e9} ' +
+            '}' +
+            '@media only print {' +
+            'button{display:none} ' +
+            'li:nth-child(odd){background:#e9e9e9} ' +
+            '}';
+
+
+        var blob = new Blob([
+                '<html>' +
+                '<head>' +
+                '<style>' +
+                CSS +
+                '</style>' +
+                '</head>' +
+                '<body>' +
+                /*'<a href="mailto:iudith.m@zim.co.il?subject=my report&body=see attachment&attachment=\"/my_location_virtual_path/myfile.lis\"">email</a>' +*/
+                '<button style="position: absolute; right: 5px;" onclick="window.print();" >Print</button>' + /* Send Email To Be Added */
+                '<div class=\'comm-log\'>' +
+                comm_log.innerHTML +
+                '</div>' +
+                '</body>' +
+                '</html>'],
+            {type: 'text/html;charset=utf-8'});
+        saveAs(blob, FileName + '.htm');
+
+        actions.style.visibility = 'visible';
+
+        startLogging();
+    }
+}
+
+function __mbcs_bindMonitoringWindowActions() {
+    /** Toggle monitoring window action*/
+    var MonitoringWindows = $('.comm-log-heading');
+
+    MonitoringWindows.forEach(function (element) {
+        element.addEventListener('click', function (event) {
+            var MonitoringWindow = $ClosestParent(element, '.comm-log');
+            var CurrentState = MonitoringWindow.getAttribute('data-current-toggle-view-state');
+            CurrentState = CurrentState || 'B';
+            switch (CurrentState) {
+                case 'A':
+                    MonitoringWindow.setAttribute('data-current-toggle-view-state', 'B');
+                    MonitoringWindow.style.position = 'relative';
+                    break;
+                case 'B':
+                    MonitoringWindow.setAttribute('data-current-toggle-view-state', 'A');
+                    MonitoringWindow.style.position = 'absolute';
+                    break;
+            }
+        });
+
+    });
+
+    /** Toggle monitoring action*/
+    var StartMonitoringButtons = $('.PlayPauseBtn');
+    StartMonitoringButtons.forEach(function (element) {
+        element.addEventListener('click', toggleLogging);
+    });
+
+    /** Export monitoring log action*/
+    var LogExportButtons = $('.ExportBtn');
+    LogExportButtons.forEach(function (element) {
+        element.addEventListener('click', fileSavePrompt);
+    });
+}
+
+/**
+ * @author codeaid
+ * */
+
+function bytesToSize(bytes, precision) {
+    var kilobyte = 1024;
+    var megabyte = kilobyte * 1024;
+    var gigabyte = megabyte * 1024;
+    var terabyte = gigabyte * 1024;
+
+    if ((bytes >= 0) && (bytes < kilobyte)) {
+        return bytes + ' B';
+
+    } else if ((bytes >= kilobyte) && (bytes < megabyte)) {
+        return (bytes / kilobyte).toFixed(precision) + ' KB';
+
+    } else if ((bytes >= megabyte) && (bytes < gigabyte)) {
+        return (bytes / megabyte).toFixed(precision) + ' MB';
+
+    } else if ((bytes >= gigabyte) && (bytes < terabyte)) {
+        return (bytes / gigabyte).toFixed(precision) + ' GB';
+
+    } else if (bytes >= terabyte) {
+        return (bytes / terabyte).toFixed(precision) + ' TB';
+
+    } else {
+        return bytes + ' B';
+    }
+}
+
+
+/** @source http://purl.eligrey.com/github/FileSaver.js/blob/master/FileSaver.js */
+var saveAs = saveAs || function (e) {
+    'use strict';
+    if (typeof e === 'undefined' || typeof navigator !== 'undefined' && /MSIE [1-9]\./.test(navigator.userAgent)) {
+        return
+    }
+    var t = e.document, n = function () {
+            return e.URL || e.webkitURL || e
+        }, r = t.createElementNS('http://www.w3.org/1999/xhtml', 'a'), o = 'download' in r, a = function (e) {
+            var t = new MouseEvent('click');
+            e.dispatchEvent(t)
+        }, i = /constructor/i.test(e.HTMLElement) || e.safari, f = /CriOS\/[\d]+/.test(navigator.userAgent),
+        u = function (t) {
+            (e.setImmediate || e.setTimeout)(function () {
+                throw t
+            }, 0)
+        }, s = 'application/octet-stream', d = 1e3 * 40, c = function (e) {
+            var t = function () {
+                if (typeof e === 'string') {
+                    n().revokeObjectURL(e)
+                } else {
+                    e.remove()
+                }
+            };
+            setTimeout(t, d)
+        }, l = function (e, t, n) {
+            t = [].concat(t);
+            var r = t.length;
+            while (r--) {
+                var o = e['on' + t[r]];
+                if (typeof o === 'function') {
+                    try {
+                        o.call(e, n || e)
+                    } catch (a) {
+                        u(a)
+                    }
+                }
+            }
+        }, p = function (e) {
+            if (/^\s*(?:text\/\S*|application\/xml|\S*\/\S*\+xml)\s*;.*charset\s*=\s*utf-8/i.test(e.type)) {
+                return new Blob([String.fromCharCode(65279), e], {type: e.type})
+            }
+            return e
+        }, v = function (t, u, d) {
+            if (!d) {
+                t = p(t)
+            }
+            var v = this, w = t.type, m = w === s, y, h = function () {
+                l(v, 'writestart progress write writeend'.split(' '))
+            }, S = function () {
+                if ((f || m && i) && e.FileReader) {
+                    var r = new FileReader;
+                    r.onloadend = function () {
+                        var t = f ? r.result : r.result.replace(/^data:[^;]*;/, 'data:attachment/file;');
+                        var n = e.open(t, '_blank');
+                        if (!n) e.location.href = t;
+                        t = undefined;
+                        v.readyState = v.DONE;
+                        h()
+                    };
+                    r.readAsDataURL(t);
+                    v.readyState = v.INIT;
+                    return
+                }
+                if (!y) {
+                    y = n().createObjectURL(t)
+                }
+                if (m) {
+                    e.location.href = y
+                } else {
+                    var o = e.open(y, '_blank');
+                    if (!o) {
+                        e.location.href = y
+                    }
+                }
+                v.readyState = v.DONE;
+                h();
+                c(y)
+            };
+            v.readyState = v.INIT;
+            if (o) {
+                y = n().createObjectURL(t);
+                setTimeout(function () {
+                    r.href = y;
+                    r.download = u;
+                    a(r);
+                    h();
+                    c(y);
+                    v.readyState = v.DONE
+                });
+                return
+            }
+            S()
+        }, w = v.prototype, m = function (e, t, n) {
+            return new v(e, t || e.name || 'download', n)
+        };
+    if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
+        return function (e, t, n) {
+            t = t || e.name || 'download';
+            if (!n) {
+                e = p(e)
+            }
+            return navigator.msSaveOrOpenBlob(e, t)
+        }
+    }
+    w.abort = function () {
+    };
+    w.readyState = w.INIT = 0;
+    w.WRITING = 1;
+    w.DONE = 2;
+    w.error = w.onwritestart = w.onprogress = w.onwrite = w.onabort = w.onerror = w.onwriteend = null;
+    return m
+}(typeof self !== 'undefined' && self || typeof window !== 'undefined' && window || this.content);
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports.saveAs = saveAs
+} else if (typeof define !== 'undefined' && define !== null && define.amd !== null) {
+    define('FileSaver.js', function () {
+        return saveAs
+    });
+}
