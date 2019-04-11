@@ -2,7 +2,7 @@
 The Language. Write C and HTML-CSS-JS side by side.
 CHTML v3.0.0
 
-* CMD
+## CMD
 ```
 1. <help> - List all available commands.
 2. <compile> <path> <prefix> <postfix> [<buff_size>|<main>=[Y|N]|<header>=[Y|N]|<includes>|<fn_return>|<fn_args>]
@@ -20,22 +20,22 @@ CHTML v3.0.0
 	<fn_return> - Return type of generated function. Default is void
 	<fn_args> - Arguments of generated function. Default is void
   ```
-* Example
+## Example
   ```
    compile path=C:\Users\ints\e2_studio\workspace\http_8\src\ints_webmvc\modules  prefix=response->sendString(request, postfix=); header=Y fn_args="Struct_WEBMVC_Request *request, Struct_WEBMVC_Response *response" includes="ints_webmvc/ints_webmvc.h" buff_size=0.5
   ```
 
-* change log
- /*
-      v 2.6.12
+## change log
+
+* v 2.6.12
     1. Command line
     2. Directory search
     3. css, chtml, html, js file parsing
-      v 2.8.0
+* v 2.8.0
     1. Directory and sub directory search
-     v3.0.0
+* v3.0.0
     1. Supply additional arguments to the generated functions. A .property file 
        is required for each of the target file which will supply the additional arguments
        add_args = char *message [ to add additional arguments to the generated function]
        add_includes = <stdio.h>,dir/my_header.h[to add specific header files]
-     */
+
