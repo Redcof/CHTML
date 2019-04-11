@@ -6,7 +6,7 @@ public class CHTMLReader {
 
     private File SourceCHTMLFile;
 
-    public static final String[] extentions = {"chtml", "html", "htm", "css", "js", "png", "jpeg", "jpg", "gif"};
+    public static final String[] extentions = {"chtml", "html", "htm", "css", "js"};
 
     public static boolean isAllowedExtension(String file_path) {
         try {
