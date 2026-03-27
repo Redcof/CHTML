@@ -3,7 +3,7 @@ The Language. Write C and HTML-CSS-JS side by side.
 CHTML v3.0.0
 
 ## CMD
-```
+```bash
 1. <help> - List all available commands.
 2. <compile> <path> <prefix> <postfix> [<buff_size>|<main>=[Y|N]|<header>=[Y|N]|<includes>|<fn_return>|<fn_args>]
 	Compile a file to *.C & *.H file.
@@ -20,10 +20,87 @@ CHTML v3.0.0
 	<fn_return> - Return type of generated function. Default is void
 	<fn_args> - Arguments of generated function. Default is void
   ```
-## Example
+## Command
+  ```bash
+   compile path=path/to/html_css_js/content  prefix="http8_server->sendString" header=Y fn_args="StructHTTP8 *request, StructHTTP8 *response" buff_size=0.5
   ```
-   compile path=C:\Users\ints\e2_studio\workspace\http_8\src\ints_webmvc\modules  prefix=response->sendString(request, postfix=); header=Y fn_args="Struct_WEBMVC_Request *request, Struct_WEBMVC_Response *response" includes="ints_webmvc/ints_webmvc.h" buff_size=0.5
+
+## Example Input
+
+```HTML
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>My Sample Page</title>
+</head>
+<body>
+    <h1>Welcome to My Website</h1>
+    <p>This is a simple paragraph demonstrating basic HTML structure.</p>
+    
+    <ul>
+        <li>First item in a list</li>
+        <li>Second item with <em>italics</em></li>
+    </ul>
+
+    <a href='https://www.w3schools.com'>Visit W3Schools for more examples</a>
+</body>
+</html>
+```
+
+## Example Command
+  ```bash
+   compile path=index.html  prefix="response->sendString(" postfix=");" header="Y" fn_args="StructHTTP8 *request, StructHTTP8 *response" buff_size=0.01
   ```
+
+## Example Output
+
+```c++
+// webrender.cpp
+
+#include <http8/httpserver.h>
+using namespace http8;
+
+void render_page(http8::StructHTTP8 *request, http8::StructHTTP8 *response){
+	response->sendString("<!-- index.html -->\n\
+	<!DOCTYPE html>\n\
+	<html lang='en'>\n\
+	<head>\n\
+		<meta charset='UTF-8'>\n\
+		<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n\
+		<title>My Sample Page</title>\n\
+	</head>\n");
+	response->sendString("<body>\n\
+		<h1>Welcome to My Website</h1>\n\
+		<p>This is a simple paragraph demonstrating basic HTML structure.</p>\n\
+		\n\
+		<ul>\n\
+        <li>First item in a list</li>\n");
+	response->sendString("<li>Second item with <em>italics</em></li>\n\
+		</ul>\n\
+		\n\
+		<a href='https://www.w3schools.com'>Visit W3Schools for more examples</a>\n\
+		</body>\n\
+	</html>");
+}
+```
+
+## Example usage
+```cpp
+
+#include <http8/httpserver.h>
+#include <webrender.h>
+
+using namespace http8;
+
+void main(void){
+	...
+	render_page(request, response);
+	...
+}
+```
 
 ## change log
 
